@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0e1116" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Tuner" />
+  <title>Speaker Tuner</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="top">
+    <h1>Speaker Tuner</h1>
+    <select id="profileSelect" aria-label="Profile"></select>
+  </header>
+
+  <main>
+    <!-- ================= MEASURE ================= -->
+    <section id="tab-measure" class="tab active">
+      <div class="card">
+        <canvas id="measurePlot" class="plot"></canvas>
+        <div class="legend" id="measureLegend"></div>
+        <div class="meter"><div id="meterBar"></div><span id="meterText">Mic off</span></div>
+      </div>
+
+      <div class="card">
+        <label class="lbl">Test signal comes from</label>
+        <div class="seg" id="sourceSeg">
+          <button data-v="internal" class="on">This phone<small>Bluetooth, CarPlay or cable</small></button>
+          <button data-v="external">Another device<small>e.g. laptop's Signal tab</small></button>
+        </div>
+        <div id="internalOpts">
+          <label class="lbl">Speakers</label>
+          <div class="seg small" id="channelSeg">
+            <button data-v="both" class="on">Both</button>
+            <button data-v="left">Left</button>
+            <button data-v="right">Right</button>
+          </div>
+          <label class="lbl">Signal level <span id="levelVal"></span></label>
+          <input type="range" id="levelSlider" min="-30" max="0" step="1" value="-10" />
+        </div>
+        <div class="row">
+          <div>
+            <label class="lbl">Position</label>
+            <input type="text" id="posName" value="Driver's head" />
+          </div>
+          <div>
+            <label class="lbl">Length</label>
+            <select id="durSelect">
+              <option value="5">5 s</option>
+              <option value="8" selected>8 s</option>
+              <option value="15">15 s</option>
+            </select>
+          </div>
+        </div>
+        <button id="startBtn" class="big">Start measurement</button>
+        <p id="status" class="status">Set the speaker volume to a normal listening level, hold the phone where your ears would be, and press Start.</p>
+      </div>
+
+      <div class="card">
+        <h2>Measurements <small id="measCount"></small></h2>
+        <ul id="measList" class="list"></ul>
+        <p class="hint">Take 3–5 measurements at slightly different spots around your head. They're averaged, which gives a more reliable EQ than a single spot.</p>
+      </div>
+    </section>
+
+    <!-- ================= EQ ================= -->
+    <section id="tab-eq" class="tab">
+      <div class="card">
+        <canvas id="eqPlot" class="plot"></canvas>
+        <div class="legend">
+          <span><i style="background:#8b97a8"></i>Measured</span>
+          <span><i style="background:#f5c542"></i>Target</span>
+          <span><i style="background:#4ade80"></i>With EQ</span>
+        </div>
+        <div class="seg small" id="predSeg">
+          <button data-v="spotify" class="on">Spotify</button>
+          <button data-v="apo">Equalizer APO</button>
+          <button data-v="car">Car</button>
+        </div>
+        <p id="eqEmpty" class="status">Take a measurement first (Measure tab).</p>
+      </div>
+
+      <div class="card">
+        <h2>Target sound</h2>
+        <select id="targetSelect"></select>
+        <label class="lbl">Bass preference <span id="bassVal"></span></label>
+        <input type="range" id="bassSlider" min="-6" max="6" step="0.5" value="0" />
+        <label class="lbl">Treble preference <span id="trebleVal"></span></label>
+        <input type="range" id="trebleSlider" min="-6" max="6" step="0.5" value="0" />
+        <details>
+          <summary>Advanced limits</summary>
+          <label class="lbl">Max boost <span id="boostVal"></span></label>
+          <input type="range" id="boostSlider" min="0" max="12" step="1" value="6" />
+          <p class="hint">Cuts are safe. Big boosts waste amplifier power and can distort small speakers.</p>
+          <div class="row">
+            <div>
+              <label class="lbl">Lowest freq to correct</label>
+              <input type="number" id="lowInput" placeholder="Auto" min="20" max="500" />
+            </div>
+            <div>
+              <label class="lbl">Highest freq</label>
+              <input type="number" id="highInput" value="14000" min="2000" max="20000" />
+            </div>
+          </div>
+          <p class="hint" id="lowHint"></p>
+        </details>
+      </div>
+
+      <div class="card" id="spotifyCard">
+        <h2>Spotify equalizer</h2>
+        <p class="hint">Spotify → Settings → Playback → Equalizer. Works on any speaker, including the car. Drag each slider to the value shown.</p>
+        <div id="spotifyBars" class="bars"></div>
+        <p class="hint" id="spotifyNote"></p>
+      </div>
+
+      <div class="card" id="apoCard">
+        <h2>Equalizer APO (laptop)</h2>
+        <p class="hint">Paste into <code>C:\Program Files\EqualizerAPO\config\config.txt</code>, replacing everything there.</p>
+        <pre id="apoText"></pre>
+        <div class="row">
+          <button id="apoCopy">Copy</button>
+          <button id="apoShare">Share</button>
+          <button id="apoDownload">Download</button>
+        </div>
+      </div>
+
+      <div class="card" id="carCard">
+        <h2>Car head unit equalizer</h2>
+        <label class="lbl">Band layout</label>
+        <select id="carPreset">
+          <option value="iso10">10-band (31 Hz … 16 kHz)</option>
+          <option value="seven">7-band (63 … 16 kHz)</option>
+          <option value="five">5-band (60 … 12 kHz)</option>
+          <option value="three">Bass / Mid / Treble</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <label class="lbl">Band frequencies in Hz, comma separated</label>
+        <input type="text" id="carBands" />
+        <div class="row">
+          <div><label class="lbl">Min dB</label><input type="number" id="carMin" value="-10" /></div>
+          <div><label class="lbl">Max dB</label><input type="number" id="carMax" value="10" /></div>
+          <div><label class="lbl">Step</label><input type="number" id="carStep" value="1" step="0.5" min="0.5" /></div>
+        </div>
+        <div id="carBars" class="bars"></div>
+      </div>
+    </section>
+
+    <!-- ================= SIGNAL ================= -->
+    <section id="tab-signal" class="tab">
+      <div class="card">
+        <h2>Signal generator</h2>
+        <p class="hint">Open this tab on the device connected to the speakers (e.g. your laptop) while the iPhone measures with "Another device" selected.</p>
+        <label class="lbl">Level <span id="genLevelVal"></span></label>
+        <input type="range" id="genLevel" min="-30" max="0" step="1" value="-10" />
+        <div class="grid">
+          <button data-gen="both">Pink noise<br><small>both</small></button>
+          <button data-gen="left">Pink noise<br><small>left only</small></button>
+          <button data-gen="right">Pink noise<br><small>right only</small></button>
+          <button data-gen="inphase">Polarity<br><small>in phase</small></button>
+          <button data-gen="outphase">Polarity<br><small>reversed</small></button>
+          <button data-gen="sweep">Sweep<br><small>20 Hz → 20 kHz</small></button>
+        </div>
+        <button id="genStop" class="big danger">Stop</button>
+        <p id="genStatus" class="status">Nothing playing.</p>
+      </div>
+      <div class="card">
+        <h2>Checks you can do by ear</h2>
+        <ul class="tips">
+          <li><b>Left / right:</b> sound should come only from that side. If not, the wiring or balance is swapped.</li>
+          <li><b>Polarity:</b> "in phase" should sound centred and full. "Reversed" should sound hollow and wide. If they sound the other way round, one speaker is wired backwards.</li>
+          <li><b>Sweep:</b> listen for buzzing or rattling panels, and for notes that suddenly jump out or vanish.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>Download test files</h2>
+        <p class="hint">For playing from a USB stick or another player.</p>
+        <div class="row">
+          <button id="dlPink">Pink noise (60 s)</button>
+          <button id="dlSweep">Sweep (10 s)</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PROFILES ================= -->
+    <section id="tab-profiles" class="tab">
+      <div class="card">
+        <h2>Profiles</h2>
+        <ul id="profileList" class="list"></ul>
+        <div class="row">
+          <input type="text" id="newProfName" placeholder="New profile name" />
+          <select id="newProfKind">
+            <option value="car">Car</option>
+            <option value="laptop">Laptop</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <button id="newProfBtn">Add profile</button>
+      </div>
+      <div class="card">
+        <h2>Backup</h2>
+        <div class="row">
+          <button id="exportBtn">Export all</button>
+          <label class="filebtn">Import<input type="file" id="importFile" accept="application/json" /></label>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= HELP ================= -->
+    <section id="tab-help" class="tab">
+      <div class="card">
+        <h2>🚗 Tuning your car</h2>
+        <ol class="tips">
+          <li>Connect the iPhone by <b>cable / wired CarPlay</b> if you can (Bluetooth works but may switch to call quality while the mic is on).</li>
+          <li>Set the car's EQ, bass/treble, loudness and "sound effects" to <b>flat / off</b>. Balance and fader centred. Spotify EQ off.</li>
+          <li>Engine off (or idling), windows and doors closed, A/C fan low.</li>
+          <li>Profile: Car. Measure tab → "This phone". Start with a <b>low</b> volume and raise it until the meter is in the green zone.</li>
+          <li>Hold the phone at ear height in the driver's seat, mic (bottom of phone) pointing forward. Take 3–5 measurements, moving the phone ~10 cm each time.</li>
+          <li>EQ tab: copy the values into the car's EQ <b>or</b> Spotify's EQ (not both).</li>
+          <li>Measure again with the EQ on to check the result. Then adjust Bass/Treble preference to taste.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h2>💻 Tuning your laptop</h2>
+        <ol class="tips">
+          <li>Open this same website on the laptop → Signal tab.</li>
+          <li>On the iPhone: Profile Laptop, Measure tab → "Another device".</li>
+          <li>Laptop: press "Pink noise both" at a normal volume.</li>
+          <li>iPhone: hold it where your head is when using the laptop (~50 cm in front of the screen). Take 3 measurements.</li>
+          <li>EQ tab → Equalizer APO → Share/Copy the text and paste it into the config file on the laptop.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h2>Good to know</h2>
+        <ul class="tips">
+          <li>Turn off silent mode on the iPhone, otherwise the phone may not play the test signal.</li>
+          <li>The iPhone mic is accurate from about 50 Hz to 14 kHz. Outside that range the app is careful.</li>
+          <li>Grey parts of a curve were too close to background noise to trust, so they're ignored.</li>
+          <li>EQ fixes tone, not distortion. If a speaker rattles, lower the bass, don't boost it.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs">
+    <button data-tab="measure" class="on"><span>🎙️</span>Measure</button>
+    <button data-tab="eq"><span>🎚️</span>EQ</button>
+    <button data-tab="signal"><span>🔊</span>Signal</button>
+    <button data-tab="profiles"><span>📁</span>Profiles</button>
+    <button data-tab="help"><span>❔</span>Help</button>
+  </nav>
+
+  <div id="toast"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

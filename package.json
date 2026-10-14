@@ -1,0 +1,8 @@
+{
+  "name": "speaker-tuner",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/dsp.test.mjs"
+  }
+}
